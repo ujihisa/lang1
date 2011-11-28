@@ -24,7 +24,7 @@ main = do
     print (name, argname)
   print $ map compile stmts
   -- very main
-  run $ M.fromList $ map compile stmts
+  run (-1) $ M.fromList $ map compile stmts
 
 data Inst = IPlus | IMult | ICall String | IPush Int |
   ILt | INeg | IZeroJump Int | IJump Int | ILabel Int |
