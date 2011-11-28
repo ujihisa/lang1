@@ -26,12 +26,12 @@ main = do
   -- very main
   run $ M.fromList $ map compile stmts
 
-data Inst = IPlus | IMult | ICall String | IPush Int | IRef String |
-  ILt | INeg | IZeroJump Int | IJump Int |
-  ILabel Int | ISetEnv String deriving (Show, Eq)
+data Inst = IPlus | IMult | ICall String | IPush Int |
+  ILt | INeg | IZeroJump Int | IJump Int | ILabel Int |
+  ISetHeap String | IGetHeap String deriving (Show, Eq)
 
 compile :: Stmt -> (String, [Inst])
-compile (Stmt name argname ast) = (name, ISetEnv argname : fst (flip S.runState 0 (compile' ast)))
+compile (Stmt name argname ast) = (name, ISetHeap argname : fst (flip S.runState 0 (compile' ast)))
 
 compile' :: AST -> S.State Int [Inst]
 compile' (Plus a b) = do
@@ -54,11 +54,11 @@ compile' (Lt a b) = do
   y <- compile' b
   return $ x ++ y ++ [ILt]
 compile' (Value n) = return [IPush n]
-compile' (Var name) = return [IRef name]
+compile' (Var name) = return [IGetHeap name]
 compile' (Let name val ast) = do
   x <- compile' val
   y <- compile' ast
-  return $ x ++ [ISetEnv name] ++ y
+  return $ x ++ [ISetHeap name] ++ y
 compile' (IfThenElse cond thenAst elseAst) = do
   label1 <- next
   label2 <- next
@@ -107,7 +107,7 @@ run' instmap ((ICall name):xs) = do
   run' instmap xs
 run' instmap ((IPush i):xs) =
   push i >> run' instmap xs
-run' instmap ((IRef name):xs) = do
+run' instmap ((IGetHeap name):xs) = do
   -- liftIO $ print $ "<<" ++ name ++ ">> referred."
   getenv name
   run' instmap xs
@@ -115,7 +115,7 @@ run' instmap (INeg:xs) = do
   x <- pop
   push (-x)
   run' instmap xs
-run' instmap ((ISetEnv name):xs) = do
+run' instmap ((ISetHeap name):xs) = do
   -- liftIO $ print $ "<<" ++ name ++ ">> setenv."
   setenv name
   run' instmap xs
