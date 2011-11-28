@@ -1,0 +1,6 @@
+("main","args")
+("f","n")
+[("main",[ISetEnv "args",IPush 2,IPush 3,ICall "print",IMult,IPush 4,ICall "f",IPlus,ICall "print"]),("f",[ISetEnv "n",IPush 1,IRef "n",ICall "print",IPlus])]
+3
+4
+11
