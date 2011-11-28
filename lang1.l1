@@ -1,2 +1,2 @@
 main args: (print (+ (* 2 (print 3)) (f 4)))
-f n: (+ 1 (print n))
+f n: (+ (let x (+ n 1) (print x)) (print n))

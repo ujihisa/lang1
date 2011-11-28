@@ -7,6 +7,7 @@ import Data.Map (Map(..))
 import Data.Maybe (fromJust)
 
 data AST = Plus AST AST | Mult AST AST | Call1 String AST |
+  Let String AST AST |
   Value Int | Var String deriving Show
 data Stmt = Stmt String String AST deriving Show
 
@@ -31,6 +32,7 @@ compile' (Call1 name ast) = compile' ast ++ [ICall name]
 compile' (Mult a b) = compile' a ++ compile' b ++ [IMult]
 compile' (Value n) = [IPush n]
 compile' (Var name) = [IRef name]
+compile' (Let name val ast) = compile' val ++ [ISetEnv name] ++ compile' ast
 
 run :: M.Map String [Inst] -> IO ((), ([Int], M.Map String Int))
 run instmap = flip S.runStateT ([], M.empty) $ do
@@ -91,11 +93,23 @@ parseStmt' = do
   return $ Stmt name argname ast
 
 parseExpr =
+  letp P.<|>
   uncurry Plus `fmap` call2 "+" P.<|>
   uncurry Mult `fmap` call2 "*" P.<|>
   call1 P.<|>
   Var `fmap` P.many1 P.letter P.<|>
   (Value . read) `fmap` P.many P.digit
+
+letp = P.try $ do
+  P.string "(let"
+  P.skipMany1 P.space
+  name <- P.many1 P.letter
+  P.skipMany1 P.space
+  val <- parseExpr
+  P.skipMany1 P.space
+  expr <- parseExpr
+  P.char ')'
+  return $ Let name val expr
 
 call1 = P.try $ do
   P.char '('
