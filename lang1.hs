@@ -31,7 +31,9 @@ data Inst = IPlus | IMult | ICall String | IPush Int |
   ISetHeap String | IGetHeap String deriving (Show, Eq)
 
 compile :: Stmt -> (String, [Inst])
-compile (Stmt name argname ast) = (name, ISetHeap argname : fst (flip S.runState 0 (compile' ast)))
+compile (Stmt name argname ast) =
+  let insts = fst $ flip S.runState 0 $ compile' ast in
+  (name, ISetHeap argname : insts)
 
 compile' :: AST -> S.State Int [Inst]
 compile' (Plus a b) = do
@@ -71,9 +73,9 @@ next = do
   S.put x
   return x
 
-run :: M.Map String [Inst] -> IO ((), ([Int], M.Map String Int))
-run instmap = flip S.runStateT ([], M.empty) $ do
-  push (-1) -- args
+run :: Int -> M.Map String [Inst] -> IO ((), ([Int], M.Map String Int))
+run args instmap = flip S.runStateT ([], M.empty) $ do
+  push args
   run' instmap [ICall "main"]
 run' instmap (IPlus:xs) = do
   y <- pop
