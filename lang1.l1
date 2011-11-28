@@ -1,2 +1,3 @@
-main args: (print (+ (* 2 (print 3)) (f 4)))
+main args: (print (+ (print (fib 10)) (+ (* 2 (print 3)) (f 4))))
 f n: (+ (let x (+ n 1) (print x)) (print n))
+fib n: (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))
