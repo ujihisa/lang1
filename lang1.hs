@@ -29,21 +29,47 @@ main = do
 data Inst = IPlus | IMult | ICall String | IPush Int | IRef String |
   ILt | INeg | IZeroJump Int | IJump Int |
   ILabel Int | ISetEnv String deriving (Show, Eq)
+
 compile :: Stmt -> (String, [Inst])
-compile (Stmt name argname ast) = (name, ISetEnv argname : compile' ast)
-compile' :: AST -> [Inst]
-compile' (Plus a b) = compile' a ++ compile' b ++ [IPlus]
-compile' (Minus a b) = compile' a ++ compile' b ++ [INeg, IPlus]
-compile' (Call1 name ast) = compile' ast ++ [ICall name]
-compile' (Mult a b) = compile' a ++ compile' b ++ [IMult]
-compile' (Lt a b) = compile' a ++ compile' b ++ [ILt]
-compile' (Value n) = [IPush n]
-compile' (Var name) = [IRef name]
-compile' (Let name val ast) = compile' val ++ [ISetEnv name] ++ compile' ast
-compile' (IfThenElse cond thenAst elseAst) =
-  let label1 = 1; label2 = 2 in
-  compile' cond ++ [IZeroJump label1] ++ compile' thenAst ++
-  [IJump label2, ILabel label1] ++ compile' elseAst ++ [ILabel label2]
+compile (Stmt name argname ast) = (name, ISetEnv argname : fst (flip S.runState 0 (compile' ast)))
+
+compile' :: AST -> S.State Int [Inst]
+compile' (Plus a b) = do
+  x <- compile' a
+  y <- compile' b
+  return $ x ++ y ++ [IPlus]
+compile' (Minus a b) = do
+  x <- compile' a
+  y <- compile' b
+  return $ x ++ y ++ [INeg, IPlus]
+compile' (Call1 name ast) = do
+  x <- compile' ast
+  return $ x ++ [ICall name]
+compile' (Mult a b) = do
+  x <- compile' a
+  y <- compile' b
+  return $ x ++ y ++ [IMult]
+compile' (Lt a b) = do
+  x <- compile' a
+  y <- compile' b
+  return $ x ++ y ++ [ILt]
+compile' (Value n) = return [IPush n]
+compile' (Var name) = return [IRef name]
+compile' (Let name val ast) = do
+  x <- compile' val
+  y <- compile' ast
+  return $ x ++ [ISetEnv name] ++ y
+compile' (IfThenElse cond thenAst elseAst) = do
+  label1 <- next
+  label2 <- next
+  x <- compile' cond
+  y <- compile' thenAst
+  z <- compile' elseAst
+  return $ x ++ [IZeroJump label1] ++ y ++ [IJump label2, ILabel label1] ++ z ++ [ILabel label2]
+next = do
+  x <- (+ 1) `fmap` S.get
+  S.put x
+  return x
 
 run :: M.Map String [Inst] -> IO ((), ([Int], M.Map String Int))
 run instmap = flip S.runStateT ([], M.empty) $ do
