@@ -3,20 +3,21 @@ import Control.Monad (forM_, when)
 import qualified Control.Monad.Trans.State as S
 import Control.Monad.Trans (liftIO)
 import qualified Data.Map as M
-import Data.Map (Map(..))
 import Data.Maybe (fromJust)
 
-data AST = Plus AST AST | Minus AST AST |
+data AST =
+  Plus AST AST |
+  Minus AST AST |
   Lt AST AST |
-  Mult AST AST | Call1 String AST |
+  Mult AST AST |
+  Call1 String AST |
   IfThenElse AST AST AST |
   Let String AST AST |
-  Value Int | Var String deriving Show
+  Value Int |
+  Var String deriving Show
 data Stmt = Stmt String String AST deriving Show
 
 main = do
-  -- print $ (Call1 "print" (Plus (Mult (Value 2) (Call1 "print" (Value 4))) (Call1 "f" (Value 4))))
-  -- print $ parseStmt "main args: (print (+ (* 2 (print 3)) (f 4)))"
   src <- readFile "lang1.l1"
   let stmts = map parseStmt (lines src)
   forM_ stmts $ \(Stmt name argname ast) -> do
@@ -26,13 +27,8 @@ main = do
   run $ M.fromList $ map compile stmts
 
 data Inst = IPlus | IMult | ICall String | IPush Int | IRef String |
-  ILt |
-  INeg |
-  IZeroJump Int |
-  IJump Int |
-  ILabel Int |
-  ISetEnv String
-  deriving (Show, Eq)
+  ILt | INeg | IZeroJump Int | IJump Int |
+  ILabel Int | ISetEnv String deriving (Show, Eq)
 compile :: Stmt -> (String, [Inst])
 compile (Stmt name argname ast) = (name, ISetEnv argname : compile' ast)
 compile' :: AST -> [Inst]
