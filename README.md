@@ -17,8 +17,10 @@
     * Negates the top value
 * IJump {label number}
     * Just jumps to the label
+    * You can only go forward
 * IZeroJump
     * Consumes 1 value and jumps to the label only when the value is 0
+    * You can only go forward
 * ILabel
     * This doesn't do anything by itself
 * ISetLocal {variable name}
