@@ -11,6 +11,10 @@
 * ICall {function name}
     * Consumes 1 value and calls a function with the value as the argument
     * The callee has to push the argument manually
+* ITailCall {function name}
+    * For optimization
+    * Ends the current function immediately after calling the given function
+    * Other behaviours are same to ICall
 * IPush {value}
     * Constant
 * INeg
