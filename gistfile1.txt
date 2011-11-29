@@ -1,6 +1,10 @@
-("main","args")
-("f","n")
-[("main",[ISetEnv "args",IPush 2,IPush 3,ICall "print",IMult,IPush 4,ICall "f",IPlus,ICall "print"]),("f",[ISetEnv "n",IPush 1,IRef "n",ICall "print",IPlus])]
-3
-4
-11
+("mainn",[ISetLocal "args",IPush 10,ICall "deep",ITailCall "print"])
+("main",[ISetLocal "args",IPush 1000000,ICall "deep",ITailCall "print"])
+("mainnn",[ISetLocal "args",IPush 10,ICall "fib",ICall "print",IPush 2,IPush 3,ICall "print",IMult,IPush 4,ICall "f",IPlus,IPlus,ITailCall "print"])
+("f",[ISetLocal "n",IGetLocal "n",IPush 1,IPlus,ISetLocal "x",IGetLocal "n",ICall "print",IGetLocal "x",ICall "print",IPlus])
+("fib",[ISetLocal "n",IGetLocal "n",IPush 2,ILt,IZeroJump 1,IGetLocal "n",IJump 2,ILabel 1,IGetLocal "n",IPush 1,INeg,IPlus,ICall "fib",IGetLocal "n",IPush 2,INeg,IPlus,ICall "fib",IPlus,ILabel 2])
+("deep",[ISetLocal "n",IGetLocal "n",IPush 1,ILt,IZeroJump 1,IPush 1,ITailCall "print",IJump 2,ILabel 1,IGetLocal "n",IPush 1,INeg,IPlus,ITailCall "deep",ILabel 2])
+("deepp",[ISetLocal "n",IPush 1,IGetLocal "n",ILt,IZeroJump 1,IGetLocal "n",IPush 1,INeg,IPlus,ITailCall "deep",IJump 2,ILabel 1,IPush 1,ITailCall "print",ILabel 2])
+1
+1
+

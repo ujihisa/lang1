@@ -20,13 +20,15 @@ data Stmt = Stmt String String AST deriving Show
 main = do
   src <- readFile "lang1.l1"
   let stmts = map parseStmt (lines src)
-  forM_ stmts $ \(Stmt name argname ast) -> do
-    print (name, argname)
-  print $ map compile stmts
+  -- forM_ stmts $ \(Stmt name argname ast) -> do
+  --  print (name, argname)
+  -- mapM_ print $ map compile stmts
+  mapM_ print $ map (optimize . compile) stmts
   -- very main
-  run (-1) $ M.fromList $ map compile stmts
+  run (-1) $ M.fromList $ map (optimize . compile) stmts
 
 data Inst = IPlus | IMult | ICall String | IPush Int |
+  ITailCall String |
   ILt | INeg | IZeroJump Int | IJump Int | ILabel Int |
   ISetLocal String | IGetLocal String deriving (Show, Eq)
 
@@ -73,6 +75,21 @@ next = do
   S.put x
   return x
 
+optimize :: (String, [Inst]) -> (String, [Inst])
+optimize (x, is) = (x, optimize' is)
+
+optimize' :: [Inst] -> [Inst]
+optimize' [] = []
+optimize' (ICall x : xs)
+  | all labelOrJump xs = ITailCall x : optimize' xs
+optimize' (ICall x : IJump l : xs)
+  | all labelOrJump $ dropWhile (/= ILabel l) xs = ITailCall x : IJump l : optimize' xs
+optimize' (x:xs) = x : optimize' xs
+
+labelOrJump (ILabel _) = True
+labelOrJump (IJump _) = True
+labelOrJump _ = False
+
 run :: Int -> M.Map String [Inst] -> IO ((), ([Int], M.Map String Int))
 run args instmap = flip S.runStateT ([], M.empty) $ do
   push args
@@ -93,6 +110,14 @@ run' instmap (ILt:xs) = do
   -- liftIO $ print (x, y, if x < y then 1 else 0)
   push $ if x < y then 1 else 0
   run' instmap xs
+run' instmap ((ITailCall name):xs) = do
+  -- liftIO $ print $ "<<<TailCall>>> " ++ name
+  if name == "print" then do
+    -- delegation
+    run' instmap ((ICall name):xs)
+    run' instmap xs
+  else do
+    run' instmap (fromJust $ M.lookup name instmap)
 run' instmap ((ICall name):xs) = do
   -- liftIO $ print $ "<<" ++ name ++ ">> called."
   if name == "print" then do

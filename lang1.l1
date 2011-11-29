@@ -1,3 +1,7 @@
-main args: (print (+ (print (fib 10)) (+ (* 2 (print 3)) (f 4))))
+mainn args: (print (deep 10))
+main args: (print (deep 1000000))
+mainnn args: (print (+ (print (fib 10)) (+ (* 2 (print 3)) (f 4))))
 f n: (+ (let x (+ n 1) (print n)) (print x))
 fib n: (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))
+deep n: (if (< n 1) (print 1) (deep (- n 1)))
+deepp n: (if (< 1 n) (deep (- n 1)) (print 1))
