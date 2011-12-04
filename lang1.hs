@@ -30,7 +30,8 @@ main = do
 data Inst = IPlus | IMult | ICall String | IPush Int |
   ITailCall String |
   ILt | INeg | IZeroJump Int | IJump Int | ILabel Int |
-  ISetLocal String | IGetLocal String deriving (Show, Eq)
+  ISetLocal String | IGetLocal String | ISetLocalKeep String
+  deriving (Show, Eq)
 
 compile :: Stmt -> (String, [Inst])
 compile (Stmt name argname ast) =
@@ -84,6 +85,8 @@ optimize' (ICall x : xs)
   | all labelOrJump xs = ITailCall x : optimize' xs
 optimize' (ICall x : IJump l : xs)
   | all labelOrJump $ dropWhile (/= ILabel l) xs = ITailCall x : IJump l : optimize' xs
+optimize' (ISetLocal x : IGetLocal y : xs)
+  | x == y = ISetLocalKeep x : optimize' xs
 optimize' (x:xs) = x : optimize' xs
 
 labelOrJump (ILabel _) = True
@@ -142,9 +145,13 @@ run' instmap (INeg:xs) = do
   x <- pop
   push (-x)
   run' instmap xs
+run' instmap ((ISetLocalKeep name):xs) = do
+  value <- peek
+  setenv name value
+  run' instmap xs
 run' instmap ((ISetLocal name):xs) = do
-  -- liftIO $ print $ "<<" ++ name ++ ">> setenv."
-  setenv name
+  value <- pop
+  setenv name value
   run' instmap xs
 run' instmap ((IJump label):xs) = do
   run' instmap $ dropWhile (/= ILabel label) xs
@@ -166,10 +173,11 @@ pop = do
   S.put (t, env)
   return h
 
-setenv name = do
-  v <- pop
+peek = (head . fst) `fmap` S.get
+
+setenv name value = do
   (s, env) <- S.get
-  S.put (s, M.insert name v env)
+  S.put (s, M.insert name value env)
 
 getenv name = do
   (_, env) <- S.get
