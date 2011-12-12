@@ -20,6 +20,14 @@ data Stmt = Stmt String String AST deriving Show
 main = do
   src <- readFile "lang1.l1"
   let stmts = map parseStmt (lines src)
+  putStrLn "stackmachine"
+  run (-1) $ M.fromList $ map (optimize . compile) stmts
+  putStrLn "registermachine"
+  -- mapM_ (\s -> print (s, compileReg s)) stmts
+  runReg (-1) $ M.fromList $ map compileReg stmts
+main1 = do
+  src <- readFile "lang1.l1"
+  let stmts = map parseStmt (lines src)
   -- forM_ stmts $ \(Stmt name argname ast) -> do
   --  print (name, argname)
   -- mapM_ print $ map compile stmts
@@ -32,6 +40,22 @@ data Inst = IPlus | IMult | ICall String | IPush Int |
   ILt | INeg | IZeroJump Int | IJump Int | ILabel Int |
   ISetLocal String | IGetLocal String | ISetLocalKeep String
   deriving (Show, Eq)
+
+data InstReg =
+  IRegMov Register Register |
+  IRegAdd Register Register |
+  IRegNeg Register |
+  IRegLt Register Register |
+  IRegMult Register Register |
+  IRegMovVal Int Register |
+  IRegCall1 String Register |
+  IRegZeroJump Register Int |
+  IRegJump Int |
+  IRegLabel Int |
+  IRegVar_ String Register
+  deriving (Show, Eq)
+
+newtype Register = Register Int deriving (Show, Eq)
 
 compile :: Stmt -> (String, [Inst])
 compile (Stmt name argname ast) =
@@ -75,6 +99,75 @@ next = do
   x <- (+ 1) `fmap` S.get
   S.put x
   return x
+
+compileReg :: Stmt -> (String, [InstReg])
+compileReg (Stmt name argname ast) =
+  let insts = fst $ S.runState f (0, [1..10]) in
+  (name, insts)
+  where
+    f = do
+      (x, l) <- compileReg' ast
+      return $ map (replaceVar (Register 0) argname) x ++ [IRegMov l (Register 0)]
+compileReg' :: AST -> S.State (Int, [Int]) ([InstReg], Register)
+compileReg' (Plus a b) = do
+  (x, l1) <- compileReg' a
+  (y, l2) <- compileReg' b
+  freeRegister l1
+  return (x ++ y ++ [IRegAdd l1 l2], l2)
+compileReg' (Minus a b) = do
+  (x, l1) <- compileReg' a
+  (y, l2) <- compileReg' b
+  freeRegister l1
+  return (x ++ y ++ [IRegNeg l2, IRegAdd l1 l2], l2)
+compileReg' (Lt a b) = do
+  (x, l1) <- compileReg' a
+  (y, l2) <- compileReg' b
+  freeRegister l1
+  return (x ++ y ++ [IRegLt l1 l2], l2)
+compileReg' (Mult a b) = do
+  (x, l1) <- compileReg' a
+  (y, l2) <- compileReg' b
+  freeRegister l1
+  return (x ++ y ++ [IRegMult l1 l2], l2)
+compileReg' (Call1 name a) = do
+  (x, l) <- compileReg' a
+  return (x ++ [IRegCall1 name l], l)
+compileReg' (IfThenElse cond thenAst elseAst) = do
+  label1 <- nextLabel
+  label2 <- nextLabel
+  (x, l1) <- compileReg' cond
+  (y, l2) <- compileReg' thenAst
+  (z, l3) <- compileReg' elseAst
+  freeRegister l1
+  freeRegister l2
+  return (x ++ [IRegZeroJump l1 label1] ++ y ++ [IRegMov l2 l1, IRegJump label2, IRegLabel label1] ++ z ++ [IRegMov l3 l1, IRegLabel label2], l1)
+compileReg' (Value i) = do
+  l <- newRegister
+  return ([IRegMovVal i l], l)
+compileReg' (Let name val expr) = do
+  (x, l1) <- compileReg' val
+  (y, l2) <- compileReg' expr
+  let y2 = map (replaceVar l1 name) y
+  freeRegister l1
+  return (x ++ y2, l2)
+compileReg' (Var name) = do
+  l <- newRegister
+  return ([IRegVar_ name l], l)
+replaceVar l1 name1 (IRegVar_ name2 l2)
+  | name1 == name2 = IRegMov l1 l2
+replaceVar _ _ inst = inst
+newRegister = do
+  (label, (i:is)) <- S.get
+  S.put (label, is)
+  return $ Register i
+freeRegister (Register i) = do
+  (label, is) <- S.get
+  S.put (label, i:is)
+nextLabel = do
+  (label, is) <- S.get
+  S.put (label + 1, is)
+  return $ label + 1
+
 
 optimize :: (String, [Inst]) -> (String, [Inst])
 optimize (x, is) = (x, optimize' is)
@@ -182,6 +275,71 @@ setenv name value = do
 getenv name = do
   (_, env) <- S.get
   push $ fromJust $ M.lookup name env
+
+runReg :: Int -> M.Map String [InstReg] -> IO ((), [M.Map Int Int])
+runReg args instmap = flip S.runStateT [M.empty] $ do
+  runReg' instmap [IRegMovVal args (Register 0), IRegCall1 "main" (Register 0)]
+runReg' instmap ((IRegMov r1 r2):xs) = do
+  a <- getRegister r1
+  setRegister r2 a
+  runReg' instmap xs
+runReg' instmap ((IRegAdd r1 r2):xs) = do
+  a <- getRegister r1
+  b <- getRegister r2
+  setRegister r2 (a + b)
+  runReg' instmap xs
+runReg' instmap ((IRegNeg r1):xs) = do
+  a <- getRegister r1
+  setRegister r1 (negate a)
+  runReg' instmap xs
+runReg' instmap ((IRegLt r1 r2):xs) = do
+  a <- getRegister r1
+  b <- getRegister r2
+  setRegister r2 (if a < b then 1 else 0)
+  runReg' instmap xs
+runReg' instmap ((IRegMult r1 r2):xs) = do
+  a <- getRegister r1
+  b <- getRegister r2
+  setRegister r2 (a * b)
+  runReg' instmap xs
+runReg' instmap ((IRegMovVal i r1):xs) = do
+  setRegister r1 i
+  runReg' instmap xs
+runReg' instmap ((IRegCall1 name r1):xs) = do
+  a <- getRegister r1
+  if name == "print" then do
+    liftIO $ print a
+  else do
+    backupRegister
+    setRegister (Register 0) a
+    runReg' instmap (fromJust $ M.lookup name instmap)
+    b <- getRegister (Register 0)
+    clearRegister
+    setRegister r1 b
+  runReg' instmap xs
+runReg' instmap ((IRegZeroJump r1 label):xs) = do
+  a <- getRegister r1
+  if a == 0
+     then runReg' instmap $ dropWhile (/= IRegLabel label) xs
+     else runReg' instmap xs
+runReg' instmap ((IRegJump label):xs) = do
+  runReg' instmap $ dropWhile (/= IRegLabel label) xs
+runReg' instmap ((IRegLabel _):xs) = do
+  runReg' instmap xs
+runReg' instmap [] = return ()
+
+getRegister (Register r) = do
+  (m:ms) <- S.get
+  return $ fromJust $ M.lookup r m
+setRegister (Register r) v = do
+  (m:ms) <- S.get
+  S.put $ M.insert r v m : ms
+backupRegister = do
+  ms <- S.get
+  S.put $ M.empty : ms
+clearRegister = do
+  (_:ms) <- S.get
+  S.put ms
 
 parseStmt :: String -> Stmt
 parseStmt xs = either (error . show) id $ P.parse parseStmt' "parseExpr" xs
