@@ -1,4 +1,4 @@
-## ISeq
+## ISeq (Stack Machine)
 
     data Inst = IPlus | IMult | ICall String | IPush Int |
       ILt | INeg | IZeroJump Int | IJump Int | ILabel Int |
@@ -31,3 +31,76 @@
     * Consumes 1 value and binds the name and the value. This lasts until (1) another ISetLocal or (2) the function ends
 * IGetLocal {variable name}
     * Gets the value of the variable and stores it
+
+## ISeq (Register Machine)
+
+    data InstReg =
+      IRegMov Register Register |
+      IRegAdd Register Register |
+      IRegNeg Register |
+      IRegLt Register Register |
+      IRegMult Register Register |
+      IRegMovVal Int Register |
+      IRegCall1 String Register |
+      IRegZeroJump Register Int |
+      IRegJump Int |
+      IRegLabel Int |
+      IRegVar_ String Register
+      deriving (Show, Eq)
+
+* IRegMov {register 1} {register 2}
+    * copys the data in {register 1} to {register 2}
+* IRegAdd {register 1} {register 2}
+    * adds the data in {register 1} and {register 2} and save it to {register 2}
+* IRegNeg {register}
+    * nagates {register}'s value and update it
+* IRegLt {register 1} {register 2}
+    * compares {register 1} and {register 2}. If the left is smaller than right, the right becomes 1. otherwise 0.
+* IRegMult {register 1} {register 2}
+    * adds the data in {register 1} and {register 2} and save it to {register 2}
+* IRegMovVal {int} {register}
+    * copys immediate value {int} to {register}
+* IRegCall1 {name} {register}
+    * calls a function with argument {register}, and saves the return value there.
+* IRegZeroJump {register} {label}
+    * if the value of {register} is 0, jumps to the label.
+* IRegJump {label}
+    * just jumpsts to the label
+* IRegLabel {label}
+    * the goal of the jumps
+* IRegVar\_ {name} {register}
+    * internal use only: refers a variable name and saves it in {register}.
+    * the compiler temporary uses this instruction and replaces this with IRegMov.
+
+r0 is always for the function argument and the return value.
+
+Every time a function is called, the runtime system creates new set of registers, saving old registers into the register-stack.
+
+## ISeq comparison
+
+    f n: (+ (let x (+ n 1) (print x)) (print n))
+
+stackmachine:
+
+    ISetLocal "n"
+    IGetLocal "n"
+    IPush 1
+    IPlus
+    ISetLocal "x"
+    IGetLocal "x"
+    ICall "print"
+    IGetLocal "n"
+    ICall "print"
+    IPlus
+
+registermachine:
+
+    IRegMov r0 r1
+    IRegMovVal 1 r2
+    IRegAdd r1 r2
+    IRegMov r2 r1
+    IRegCall1 "print" r1
+    IRegMov r0 r2
+    IRegCall1 "print" r2
+    IRegAdd r1 r2
+    IRegMov r2 r0

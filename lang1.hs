@@ -21,9 +21,10 @@ main = do
   src <- readFile "lang1.l1"
   let stmts = map parseStmt (lines src)
   putStrLn "stackmachine"
+  mapM_ (\s -> print (compile s)) stmts
   run (-1) $ M.fromList $ map (optimize . compile) stmts
   putStrLn "registermachine"
-  -- mapM_ (\s -> print (s, compileReg s)) stmts
+  mapM_ (\s -> print (s, compileReg s)) stmts
   runReg (-1) $ M.fromList $ map compileReg stmts
 main1 = do
   src <- readFile "lang1.l1"
@@ -55,7 +56,9 @@ data InstReg =
   IRegVar_ String Register
   deriving (Show, Eq)
 
-newtype Register = Register Int deriving (Show, Eq)
+newtype Register = Register Int deriving Eq
+instance Show Register where
+  show (Register r) = 'r' : show r
 
 compile :: Stmt -> (String, [Inst])
 compile (Stmt name argname ast) =
