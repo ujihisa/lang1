@@ -20,12 +20,13 @@ data Stmt = Stmt String String AST deriving Show
 main = do
   src <- readFile "lang1.l1"
   let stmts = map parseStmt (lines src)
-  putStrLn "stackmachine"
-  mapM_ (\s -> print (compile s)) stmts
+  -- putStrLn "stackmachine"
+  -- mapM_ (\s -> print (compile s)) stmts
   run (-1) $ M.fromList $ map (optimize . compile) stmts
-  putStrLn "registermachine"
-  mapM_ (\s -> print (s, compileReg s)) stmts
-  runReg (-1) $ M.fromList $ map compileReg stmts
+  -- putStrLn "registermachine"
+  -- mapM_ (\s -> print $ compileReg s) stmts
+  -- mapM_ (\s -> print $ (optimizeReg . compileReg) s) stmts
+  runReg (-1) $ M.fromList $ map (optimizeReg . compileReg) stmts
 main1 = do
   src <- readFile "lang1.l1"
   let stmts = map parseStmt (lines src)
@@ -50,6 +51,7 @@ data InstReg =
   IRegMult Register Register |
   IRegMovVal Int Register |
   IRegCall1 String Register |
+  IRegTailCall1 String Register |
   IRegZeroJump Register Int |
   IRegJump Int |
   IRegLabel Int |
@@ -171,6 +173,21 @@ nextLabel = do
   S.put (label + 1, is)
   return $ label + 1
 
+optimizeReg :: (String, [InstReg]) -> (String, [InstReg])
+optimizeReg (x, is) = (x, optimizeReg' is)
+optimizeReg' :: [InstReg] -> [InstReg]
+optimizeReg' [] = []
+optimizeReg' (IRegCall1 n r : IRegMov r1 r2 : xs)
+  | xs == [] || all labelOrJumpReg (init xs) =
+    IRegTailCall1 n r : optimizeReg' xs
+optimizeReg' (IRegCall1 n r : IRegMov r1 r2 : IRegJump l : xs)
+  | all labelOrJumpReg $ init $ dropWhile (/= IRegLabel l) xs =
+    IRegTailCall1 n r : IRegJump l : optimizeReg' xs
+optimizeReg' (x:xs) = x : optimizeReg' xs
+
+labelOrJumpReg (IRegLabel _) = True
+labelOrJumpReg (IRegJump _) = True
+labelOrJumpReg _ = False
 
 optimize :: (String, [Inst]) -> (String, [Inst])
 optimize (x, is) = (x, optimize' is)
@@ -320,6 +337,15 @@ runReg' instmap ((IRegCall1 name r1):xs) = do
     clearRegister
     setRegister r1 b
   runReg' instmap xs
+runReg' instmap ((IRegTailCall1 name r1):xs) = do
+  if name == "print" then do
+    -- delegation
+    runReg' instmap ((IRegCall1 name r1):xs)
+    runReg' instmap xs
+  else do
+    a <- getRegister r1
+    setRegister (Register 0) a
+    runReg' instmap (fromJust $ M.lookup name instmap)
 runReg' instmap ((IRegZeroJump r1 label):xs) = do
   a <- getRegister r1
   if a == 0

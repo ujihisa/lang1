@@ -42,6 +42,7 @@
       IRegMult Register Register |
       IRegMovVal Int Register |
       IRegCall1 String Register |
+      IRegTailCall1 String Register |
       IRegZeroJump Register Int |
       IRegJump Int |
       IRegLabel Int |
@@ -62,6 +63,11 @@
     * copys immediate value {int} to {register}
 * IRegCall1 {name} {register}
     * calls a function with argument {register}, and saves the return value there.
+* IRegTailCall1 {name} {register}
+    * For optimization
+    * Ends the current function immediately after calling the given function
+    * Other behaviours are same to IRegCall1
+    * This implicitly movs from {register} to r0
 * IRegZeroJump {register} {label}
     * if the value of {register} is 0, jumps to the label.
 * IRegJump {label}
@@ -104,3 +110,17 @@ registermachine:
     IRegCall1 "print" r2
     IRegAdd r1 r2
     IRegMov r2 r0
+
+## Tail Call Optimization
+
+Both stackmachine VM and registermachine VM optimize tail calls to jumps.
+
+    main args: (print (deep 1000000))
+    deep n: (if (< n 1) (print 1) (deep (- n 1)))
+
+run
+
+    $ ghc -O3 lang1 -o lang1 -rtsopts
+    $ ./lang1 +RTS -K1K -RTS
+
+This will cause stack overflow unless you apply optimizers. Otherwise even though it will take time, it succeeds.
