@@ -1,3 +1,31 @@
+# lang1
+
+Program
+
+    main args: (print 123)
+
+Instruction set (type 1: stackmachine VM)
+
+    ISetLocal "args"
+    IPush 123
+    ICall "print"
+
+Instruction set (type 1: stackmachine VM)
+
+    IRegMovVal 123 r1
+    IRegCall1 "print" r1
+    IRegMov r1 r0
+
+Result (no matter which VM you used)
+
+    123
+
+* Written in Haskell
+* Written by Tatsuhiro Ujihisa
+    * <http://twitter.com/ujm>
+* Some optimizations included
+    * Tail call optimization
+
 ## ISeq (Stack Machine)
 
     data Inst = IPlus | IMult | ICall String | IPush Int |
